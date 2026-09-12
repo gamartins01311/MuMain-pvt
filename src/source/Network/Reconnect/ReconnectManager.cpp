@@ -6,6 +6,10 @@
 #include <cmath>
 #include <cwchar>
 
+#ifndef _WIN32
+#include <poll.h>
+#endif
+
 #include "Network/Server/WSclient.h"   // SocketClient, CreateSocket, DeleteSocket,
                                        // ResetClientToLoginScene, protocol states
 #include "Scenes/SceneCore.h"          // SceneFlag, szServerIpAddress, g_ServerPort
@@ -266,6 +270,30 @@ void ReconnectManager::PollProbe()
 {
     const SOCKET probe = static_cast<SOCKET>(m_probeSocket);
 
+#ifndef _WIN32
+    pollfd probeFd{};
+    probeFd.fd = probe;
+    probeFd.events = POLLOUT | POLLERR | POLLHUP;
+
+    const int pollResult = poll(&probeFd, 1, 0);
+    if (pollResult > 0 && (probeFd.revents & (POLLOUT | POLLERR | POLLHUP)) != 0)
+    {
+        int soError = 0;
+        socklen_t len = sizeof(soError);
+        getsockopt(probe, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&soError), &len);
+        CloseProbe();
+
+        if (soError == 0)
+        {
+            m_beginPending = true;
+        }
+        else
+        {
+            EnterPhase(Phase::Probing);
+        }
+        return;
+    }
+#else
     fd_set writeSet;
     fd_set errorSet;
     FD_ZERO(&writeSet);
@@ -302,6 +330,7 @@ void ReconnectManager::PollProbe()
         CloseProbe();
         EnterPhase(Phase::Probing);
     }
+#endif
 }
 
 void ReconnectManager::CloseProbe()

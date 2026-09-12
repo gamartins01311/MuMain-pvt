@@ -534,6 +534,11 @@ void MiniAudioBackend::PlayMusic(const char* name, bool enforce)
         return;
     }
 
+    if (!enforce && m_failedMusicName == normalizedName)
+    {
+        return;
+    }
+
     // Stop and release previous music stream
     if (m_musicLoaded)
     {
@@ -557,6 +562,10 @@ void MiniAudioBackend::PlayMusic(const char* name, bool enforce)
 
     if (result != MA_SUCCESS)
     {
+        if (!enforce)
+        {
+            m_failedMusicName = normalizedName;
+        }
         mu::log::Get("audio")->error("AUDIO: MiniAudioBackend::PlayMusic -- failed to init stream '{}' ({})", name,
                                      static_cast<int>(result));
         return;
@@ -569,6 +578,7 @@ void MiniAudioBackend::PlayMusic(const char* name, bool enforce)
 
     m_musicLoaded = true;
     m_currentMusicName = normalizedName;
+    m_failedMusicName.clear();
 }
 
 // ---------------------------------------------------------------------------
